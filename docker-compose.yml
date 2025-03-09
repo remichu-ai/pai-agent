@@ -1,0 +1,36 @@
+version: "3.9"
+services:
+  gallama:
+    image: remichu/gallama:latest
+    command:
+      - gallama
+      - run
+      - -id
+      - "\"model_name=whisper-turbo\""
+#      - "\"model_name=whisper-large-v3\""
+      - -id
+       - "\"model_name=qwen-2.5-VL-7B max_seq_len=32768\""
+#      - "\"model_name=qwen-2.5-VL-7B gpus=0,16,21,21 max_seq_len=32768\""      # example on setting GPUs
+      - -id
+      - "\"model_name=kokoro\""
+    network_mode: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
+
+  livekit-server:
+    image: livekit/livekit-server:latest
+    command: ["/livekit-server", "--dev", "--bind", "0.0.0.0"]
+    network_mode: host
+
+  pai-agent:
+    image: remichu/pai-agent:latest
+    network_mode: host
+
+  token-service:
+    image: remichu/pai-token:latest
+    network_mode: host

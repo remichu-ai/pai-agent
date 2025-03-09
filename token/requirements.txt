@@ -1,0 +1,6 @@
+pydantic
+uvicorn
+fastapi
+livekit >= 0.20.2
+livekit-protocol
+livekit-api
