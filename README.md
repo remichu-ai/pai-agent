@@ -19,9 +19,18 @@ Following is the detail of each component
 ## Download Model
 ### Native Gallama installation
 
-I would suggest you try out the setup with: Whisper Turbo + Qwen 2.5 VL 7B + Kokoro 
+I would suggest you try out the setup with: Whisper Large V3 Turbo + Qwen 2.5 VL 7B + Kokoro
+- STT: whisper series is supported
+- LLM: all LLM as supported by exllama v2 or llama cpp. 
+- VLM: for vision capability, currently only support with exllama v2
+  - Qwen VL 2.5 7B/ 70B
+  - Pixtral (not as good as Qwen VL for video task)
+- TTS:
+  - Kokoro
+  - GPT v2 with voice cloning (in progress)
+
 Then you can change the model to something more to your need. 
-If you are non-native Speaker, I would recommend to use Whisper Large V3 instead of Whisper Turbo
+If you are non-native Speaker, I would recommend to use Whisper Large V3 instead of the Turbo version
 
 To see the list of model with automated downloader, you can run
 ```shell
@@ -30,8 +39,6 @@ gallama list available
 
 Download model with gallama installed:
 ```shell
-gallama download kokoro
-
 gallama download whisper-turbo
 # gallama download whisper-large-v3
 
@@ -52,9 +59,8 @@ docker run -e GALLAMA_HOME_PATH=/home/remichu/gallama -it --network=host --gpus 
 docker run -e GALLAMA_HOME_PATH=/home/yourid/gallama -it --network=host -v -v /home/yourid/gallama:/home/yourid/gallama remichu/gallama:latest /bash
 
 # from here you would already be inside the gallama docker to run gallama command
-gallama download kokoro
 
-gallama download whisper-turbo
+gallama download whisper-large-v3-turbo
 # gallama download whisper-large-v3
 
 # You can change to another quantization as needed, but do use 8.0 if you can

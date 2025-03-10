@@ -13,7 +13,6 @@ from livekit.agents import (
     AutoSubscribe,
     JobContext,
 )
-from livekit.agents.multimodal import MultimodalAgent
 from livekit.plugins import openai
 from livekit.plugins.openai._oai_api import build_oai_function_description
 from livekit.plugins.openai.realtime import api_proto
@@ -31,8 +30,8 @@ logger = logging.getLogger("my-worker")
 logger.setLevel(logging.INFO)
 
 from MultiModalAgentModified import MultimodalAgentModified
-from livekit.agents import llm, transcription, vad
-from typing import Literal, Protocol
+from livekit.agents import llm
+from typing import Literal
 import os
 
 
@@ -44,56 +43,12 @@ except ImportError as e:
     AssistantFnc = None
     assistantFnc = None
 
-
-# the list of allowed tool for function calling
-# Possible values are:
-# True -> allow all available tools
-# False -> disable tool
-# or list of function name allowed
-
-# allowed_tools: Union[bool, List[str]] = True
-
-last_config: Dict[str, Any] = {}
-assistant: MultimodalAgent = None
+last_config: Dict[str, Any] = {}        # global variable
+assistant: MultimodalAgentModified = None       # global variable
 
 with open("system_prompt.txt", "r") as file:
     DEFAULT_INSTRUCTION = file.read()
-#
-# DEFAULT_INSTRUCTION = """
-# Remember these key points:
-# - Keep responses brief, clear, and natural-sounding (like casual speech)
-# - Prefer simple words over complex terminology
-# - Break longer responses into shorter sentences
-#
-# Speech Recognition Handling:
-# - User input comes from speech transcription and may contain errors
-# - Common issues include pronunciation-based mistakes from non-native English speakers
-# - If a word seems incorrect or unclear, politely ask for clarification like "Did you mean [likely word]?"
-# - When in doubt about the entire question, confirm by repeating it back
-#
-# Interactive Elements:
-# - User may interrupt during your response with <user_interrupt>
-# - When interrupted, stop immediately and address the interruption
-# - Resume previous topic only if explicitly requested
-#
-# Response Style:
-# - Your response will be converted to voice to playback to user by TTS.
-# - When asking for how to pronounce words, phonetic spellings and romanization are prohibited. Example:
-#   Allow: 猫比狗聪明
-#   PROHIBITED: 猫比狗聪明 (máo bǐ gǒu cōng míng)
-# - Use conversational markers like "Well," "You know," "Right"
-# - Express agreement/understanding with brief acknowledgments
-# - Mirror the user's speaking pace and energy level
-#
-# Video:
-# - User might send you video from his phone for live question answer
-# - The video might be shared with you in the form of a series of consecutive images
-#
-# Overall:
-# Be a friendly, upbeat and concise conversational assistant.
-# You are LLM in an STT to LLM to TTS system.
-# Keep your initial greeting to user to 1 sentence.
-# """
+
 
 
 @dataclass
@@ -421,6 +376,9 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.Participant):
     assistant.start(ctx.room)
     session = model.sessions[0]
 
+    # disable tool
+
+
     if config.modalities == ["text", "audio"]:
         session.conversation.item.create(
             llm.ChatMessage(
@@ -528,8 +486,6 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.Participant):
         if data.caller_identity != participant.identity:
             return
 
-
-
         global assistant
         global assistantFnc
         tool_list = assistant.fnc_ctx
@@ -540,20 +496,6 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.Participant):
 
         logger.info(f"current tool_list: {tool_list}")
         return json.dumps(tool_list)
-
-        # # new config for gallama
-        # fnc_ctx = model.sessions[0].fnc_ctx
-        #
-        # tool_list = []
-        # if fnc_ctx is not None:
-        #     for fnc in fnc_ctx.ai_functions.values():
-        #         # the realtime API is using internally-tagged polymorphism.
-        #         # build_oai_function_description was built for the ChatCompletion API
-        #         tool_list.append(fnc.name)
-        #
-        # if not tool_list:
-        #     tool_list = "NONE"
-        # return json.dumps({"tool_list": tool_list})
 
 
     @ctx.room.local_participant.register_rpc_method("setToolList")
@@ -571,7 +513,7 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.Participant):
 
 
         logger.info(f"data.payload: {data.payload}")
-        tool_list: Union[bool, List[str]] = json.loads(data.payload).get("tool_list", False)
+        tool_list: Union[bool, List[str]] = json.loads(data.payload).get("tool_list", [])
         logger.info(f"set tool_list: {tool_list}")
 
         global assistantFnc
@@ -583,12 +525,6 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.Participant):
         session = model.sessions[0]
         session.session_update()
 
-
-        #
-        # global allowed_tools
-        # allowed_tools = tool_list
-
-        # return json.dumps({"changed": "true", "tool_list": tool_list})
         return json.dumps({"changed": "true"})
 
 

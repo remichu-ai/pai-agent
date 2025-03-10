@@ -1,19 +1,22 @@
-version: "3.9"
 services:
   gallama:
     image: remichu/gallama:latest
-    command:
+    entrypoint:
       - gallama
       - run
       - -id
-      - "\"model_name=whisper-turbo\""
-#      - "\"model_name=whisper-large-v3\""
+      - "model_name=whisper-large-v3-turbo"
+#      - "model_name=whisper-large-v3"
       - -id
-       - "\"model_name=qwen-2.5-VL-7B max_seq_len=32768\""
-#      - "\"model_name=qwen-2.5-VL-7B gpus=0,16,21,21 max_seq_len=32768\""      # example on setting GPUs
+      - "model_name=qwen-2.5-VL-7B max_seq_len=32768"
+#      - "model_name=qwen-2.5-VL-7B gpus=0,16,21,21 max_seq_len=32768"      # example on setting GPUs
       - -id
-      - "\"model_name=kokoro\""
+      - "model_name=kokoro"
     network_mode: host
+    environment:
+      - GALLAMA_HOME_PATH=/home/remichu/gallama         # change the path to where you store your model
+    volumes:
+      - /home/remichu/gallama:/home/remichu/gallama     # change the path to where you store your model
     deploy:
       resources:
         reservations:
@@ -24,7 +27,13 @@ services:
 
   livekit-server:
     image: livekit/livekit-server:latest
-    command: ["/livekit-server", "--dev", "--bind", "0.0.0.0"]
+    entrypoint:
+     - "/livekit-server"
+     - "--dev"
+     - "--bind"
+     - "0.0.0.0"
+     - "--keys"
+     - "devkey: secret"
     network_mode: host
 
   pai-agent:
