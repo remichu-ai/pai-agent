@@ -376,17 +376,60 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.Participant):
     assistant.start(ctx.room)
     session = model.sessions[0]
 
-    # disable tool
+    # if config.modalities == ["text", "audio"]:
+    #     session.conversation.item.create(
+    #         llm.ChatMessage(
+    #             role="user",
+    #             content="Hello",
+    #         )
+    #     )
+    #     session.response.create()
 
+    @ctx.room.local_participant.register_rpc_method("createInitialResponse")
+    async def create_initial_response(
+            data: rtc.rpc.RpcInvocationData = None,
+    ):
+        """
+        Trigger response creation. To be used when VAD is not activated.
+        Before starting the initial response, delete any existing conversation items.
+        """
+        global assistant
 
-    if config.modalities == ["text", "audio"]:
-        session.conversation.item.create(
-            llm.ChatMessage(
-                role="user",
-                content="Hello",
+        try:
+            logger.info("initial response create")
+
+            # Interrupt any current message
+            assistant.interrupt()
+
+            # Get the current session (assuming the first session is active)
+            try:
+                # Retrieve current conversation items via the chat context
+                chat_ctx = session.chat_ctx_copy()
+                delete_tasks = []
+                for message in chat_ctx.messages:
+                    # Delete each conversation item by its id
+                    delete_tasks.append(session.conversation.item.delete(item_id=message.id))
+                if delete_tasks:
+                    await asyncio.gather(*delete_tasks)
+                    logger.info("Deleted existing conversation items")
+            except Exception as e:
+                pass
+
+            # Create a new conversation item to start the response
+            session.conversation.item.create(
+                llm.ChatMessage(
+                    role="user",
+                    content="Hello",
+                )
             )
-        )
-        session.response.create()
+
+            # Generate the reply with the assistant
+            assistant.generate_reply(on_duplicate="cancel_existing", enable_vad=False)
+
+            return json.dumps({"changed": "true"})
+        except Exception as err:
+            logger.error(err)
+            return json.dumps({"changed": "false"})
 
 
     # modified method for gallama
@@ -572,6 +615,55 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.Participant):
 
         except requests.exceptions.RequestException as e:
             print(f"Failed to send record start time to the backend: {e}")
+
+        return json.dumps({"changed": "true"})
+
+
+    @ctx.room.local_participant.register_rpc_method("clearHistory")
+    async def clear_message_history(
+        data: rtc.rpc.RpcInvocationData = None,
+    ):
+        """
+        This function send the time stamp when user click the record button on non handfree mode
+
+        :param data:
+            a list of available tool name
+        """
+
+        logger.info(f"clear conversation history")
+
+        openai_base_url = os.getenv('OPENAI_BASE_URL', 'http://127.0.0.1:8000/v1')
+
+        # Send the payload to the backend via an HTTP POST request
+        try:
+            response = requests.post(
+                f"{openai_base_url}/clear_history",  # Endpoint for the backend
+            )
+
+            # Check if the request was successful
+            if response.status_code == 200:
+                logger.debug("Successfully clear history.")
+            else:
+                print(
+                    f"Failed to clear history. Status code: {response.status_code}, Response: {response.text}")
+
+            # clear in progress item
+            try:
+                # Retrieve current conversation items via the chat context
+                chat_ctx = session.chat_ctx_copy()
+                delete_tasks = []
+                for message in chat_ctx.messages:
+                    # Delete each conversation item by its id
+                    delete_tasks.append(session.conversation.item.delete(item_id=message.id))
+                if delete_tasks:
+                    await asyncio.gather(*delete_tasks)
+                    logger.info("Deleted existing conversation items")
+            except Exception as e:
+                pass
+
+
+        except requests.exceptions.RequestException as e:
+            print(f"Failed to clear history: {e}")
 
         return json.dumps({"changed": "true"})
 
