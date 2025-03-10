@@ -75,6 +75,11 @@ Ensure that you have:
 
 Download the model that you want to run and edit the docker compose accordingly *refer the docker-compose.yml*
 
+Then run the following command:
+```shell
+docker compose up
+```
+
 ## Run with Gallama installed natively
 
 You can simply run the equivalent command as in the docker compose. Here are examples:
