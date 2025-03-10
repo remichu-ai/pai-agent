@@ -39,6 +39,10 @@ services:
   pai-agent:
     image: remichu/pai-agent:latest
     network_mode: host
+#    volumes:
+#      - /home/remichu/my_system_prompt.txt:/app/system_prompt.txt         # overwrite system prompt
+#      - /home/remichu/my_tools.py:/app/tools.py                           # overwrite tool code
+
 
   token-service:
     image: remichu/pai-token:latest
