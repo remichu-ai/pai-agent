@@ -84,7 +84,7 @@ docker compose up
 
 You can simply run the equivalent command as in the docker compose. Here are examples:
 ```shell
-gallama run -id "model_name=whisper-turbo" -id "model_name=qwen-2.5-VL-7B max_seq_len=32768" -id "model_name=kokoro"
+gallama run -id "model_name=whisper-large-v3-turbo" -id "model_name=qwen-2.5-VL-7B max_seq_len=32768" -id "model_name=kokoro"
 ```
 
 or with whisper large v3 and gpus setting:
