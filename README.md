@@ -47,6 +47,11 @@ gallama download qwen-2.5-VL-7B:8.0
 ```
 
 ### Using Docker
+
+To enable GPUs usage in docker, please install NVIDIA Container Toolkit
+https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
+
+
 If you use docker, create a folder that will be where gallama read the model from e.g. 
 `/home/yourid/gallama`
 
@@ -91,3 +96,15 @@ or with whisper large v3 and gpus setting:
 ```shell
 gallama run -id "model_name=whisper-large-v3" -id "model_name=qwen-2.5-VL-7B gpus=0,16,21,21 max_seq_len=32768" -id "model_name=kokoro"
 ```
+
+## Find your IP
+
+THe last step you need is to find your IP to set inside PAI app so that it can connect to the backend.
+
+### For local network access
+You can find your server URL at by run this command on Ubuntu
+`hostname -I`
+
+### For remote access
+For remote access, you will need a VPN service that let you create a private network between your phone and your backend.
+I use tailscale (this is not endorsement), however, I would suggest that you do your research to find a solution that meet your security need. 

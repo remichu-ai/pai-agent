@@ -86,6 +86,9 @@ _original_session_update = openai.realtime.RealtimeSession.session_update
 
 @functools.wraps(_original_session_update)
 def session_update_gallama(self, *args, **kwargs):
+    global last_config
+    # logger.info(f"inside session_update_gallama - kwargs: {kwargs}")
+    # logger.info(f"inside session_update_gallama - self_opts: {self._opts}")
 
     # get the keywords argument from orginal livekits implementation from kwarg
     modalities = kwargs.get("modalities", None)
@@ -116,10 +119,14 @@ def session_update_gallama(self, *args, **kwargs):
         self._opts.output_audio_format = output_audio_format
     if input_audio_transcription is not None:
         self._opts.input_audio_transcription = input_audio_transcription
+
     if turn_detection is not None and turn_detection.create_response:
         self._opts.turn_detection = turn_detection
     else:
+        # not auto response created
+        # set this None as livekit class doesn't keep create_response setting like OpenAI API
         self._opts.turn_detection = None
+
     if tool_choice is not None:
         self._opts.tool_choice = tool_choice
     if temperature is not None:
@@ -162,7 +169,10 @@ def session_update_gallama(self, *args, **kwargs):
         "input_audio_format": self._opts.input_audio_format,
         "output_audio_format": self._opts.output_audio_format,
         "input_audio_transcription": input_audio_transcription_opts,
-        "turn_detection": server_vad_opts,
+        # for non hand free mode, server_vad_opts will be None here
+        # hence pass the arguments received from kwargs
+        # which will be the full turn_detection setting with create_response = False
+        "turn_detection": kwargs.get("turn_detection", None) or last_config.get("turn_detection", None) or server_vad_opts,
         "tools": tools,
         "tool_choice": self._opts.tool_choice,
         "temperature": self._opts.temperature,
@@ -180,7 +190,6 @@ def session_update_gallama(self, *args, **kwargs):
         del session_data["max_response_output_tokens"]  # type: ignore
 
     # merge config
-    global last_config
     session_data = GallamaSessionConfig(
         **{
             **last_config,
@@ -291,6 +300,8 @@ def parse_session_config_gallama(data: Dict[str, Any]) -> GallamaSessionConfig:
         data.pop("tools")
 
     config = GallamaSessionConfig(**data)
+
+    logger.info(f"Parsed session config Gallama post: {config}")
     return config
 
 
@@ -449,12 +460,9 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.Participant):
 
         # new config for gallama
         new_config = parse_session_config_gallama(json.loads(data.payload))
-        logger.info(f"new_config: {new_config}")
 
         if config != new_config:
-            logger.info(
-                f"config changed: {new_config.to_dict()}, participant: {participant.identity}"
-            )
+
             session = model.sessions[0]
             session.session_update(
                 **new_config.model_dump(exclude_unset=False)
