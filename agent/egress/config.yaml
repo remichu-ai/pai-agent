@@ -1,0 +1,74 @@
+# required fields
+api_key: devkey
+api_secret: secret
+insecure: true
+ws_url: ws://172.17.0.1:7880
+redis:
+  address: 172.17.0.1:6379
+#  username: redis username
+#  password: redis password
+#  db: redis db
+
+## optional fields
+#health_port: port used for http health checks (default 0)
+#template_port: port used to host default templates (default 7980)
+#prometheus_port: port used to collect prometheus metrics (default 0)
+#debug_handler_port: port used to host http debug handlers (default 0)
+#logging:
+#  level: debug, info, warn, or error (default info)
+#  json: true
+#template_base: can be used to host custom templates (default http://localhost:<template_port>/)
+#backup_storage: files will be moved here when uploads fail. location must have write access granted for all users
+#enable_chrome_sandbox: if true, egress will run Chrome with sandboxing enabled. This requires a specific Docker setup, see below.
+#cpu_cost: # optionally override cpu cost estimation, used when accepting or denying requests
+#  room_composite_cpu_cost: 3.0
+#  web_cpu_cost: 3.0
+#  track_composite_cpu_cost: 2.0
+#  track_cpu_cost: 1.0
+#session_limits: # optional egress duration limits - once hit, egress will end with status EGRESS_LIMIT_REACHED
+#  file_output_max_duration: 1h
+#  stream_output_max_duration: 90m
+#  segment_output_max_duration: 3h
+#
+## file upload config - only one of the following. Can be overridden per request
+#s3:
+#  access_key: AWS_ACCESS_KEY_ID env or IAM role can be used instead
+#  secret: AWS_SECRET_ACCESS_KEY env or IAM role can be used instead
+#  session_token: AWS_SESSION_TOKEN env or IAM role can be used instead
+#  region: AWS_DEFAULT_REGION env or IAM role can be used instead
+#  endpoint: (optional) custom endpoint
+#  bucket: bucket to upload files to
+#  # the following s3 options can only be set in config, *not* per request, they will be added to any per-request options
+#  proxy_config:
+#    url: (optional) proxy url
+#    username: (optional) proxy username
+#    password: (optional) proxy password
+#  max_retries: (optional, default=3) number or retries to attempt
+#  max_retry_delay: (optional, default=5s) max delay between retries (e.g. 5s, 100ms, 1m...)
+#  min_retry_delay: (optional, default=500ms) min delay between retries (e.g. 100ms, 1s...)
+#  aws_log_level: (optional, default=LogOff) log level for aws sdk (LogDebugWithRequestRetries, LogDebug, ...)
+#azure:
+#  account_name: AZURE_STORAGE_ACCOUNT env can be used instead
+#  account_key: AZURE_STORAGE_KEY env can be used instead
+#  container_name: container to upload files to
+#gcp:
+#  credentials_json: GOOGLE_APPLICATION_CREDENTIALS env can be used instead
+#  bucket: bucket to upload files to
+#  proxy_config:
+#    url: (optional) proxy url
+#    username: (optional) proxy username
+#    password: (optional) proxy password
+#alioss:
+#  access_key: Ali OSS AccessKeyId
+#  secret: Ali OSS AccessKeySecret
+#  region: Ali OSS region
+#  endpoint: (optional) custom endpoint
+#  bucket: bucket to upload files to
+
+# dev/debugging fields
+#debug:
+#  enable_profiling: create and upload pipeline dot file and pprof file on pipeline failure
+#  s3: upload config for dotfiles (see above)
+#  azure: upload config for dotfiles (see above)
+#  gcp: upload config for dotfiles (see above)
+#  alioss: upload config for dotfiles (see above)

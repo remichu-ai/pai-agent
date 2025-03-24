@@ -1,0 +1,89 @@
+# this version of docker compose use egress service to record audio
+# Look for all the CHANGE HERE and modify to local path
+# the to have permission to write to the /out, the volume that map to it should have 777 permission
+# this is due to egress image running as root
+
+services:
+  gallama:
+    image: remichu/gallama:latest
+    entrypoint:
+      - gallama
+      - run
+      - -id
+      - "model_name=whisper-large-v3-turbo"
+#      - "model_name=whisper-large-v3"
+      - -id
+      - "model_name=qwen-2.5-VL-7B max_seq_len=32768"
+#      - "model_name=qwen-2.5-VL-7B gpus=0,16,21,21 max_seq_len=32768"      # example on setting GPUs
+      - -id
+      - "model_name=kokoro"
+    network_mode: host
+    environment:
+      - GALLAMA_HOME_PATH=/home/remichu/gallama         # change the path to where you store your model
+    volumes:
+      - /home/remichu/gallama:/home/remichu/gallama     # change the path to where you store your model
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
+
+  redis:
+    image: "redis:latest"
+    entrypoint:
+      - docker-entrypoint.sh
+      - redis-server
+      - /usr/local/etc/redis/redis.conf
+    network_mode: host
+    volumes:
+      # CHANGE HERE
+      # the first half is the local path to the redis.conf from pai-agent repo
+      - /home/remichu/work/ML/pai-agent/agent/egress/redis.conf:/usr/local/etc/redis/redis.conf
+
+  livekit-server:
+    image: livekit/livekit-server:latest
+    depends_on:
+      - redis
+    entrypoint:
+     - "/livekit-server"
+     - "--dev"
+     - "--bind"
+     - "0.0.0.0"
+     - "--keys"
+     - "devkey: secret"
+     - "--redis-host"
+     - "127.17.0.1:6379"    # livekit server communicate with egress via redis
+    network_mode: host
+
+  livekit-egress:
+    image: livekit/egress:latest
+    depends_on:
+      - redis
+    network_mode: host
+    environment:
+      - EGRESS_CONFIG_FILE=/out/config.yaml
+    volumes:
+      # CHANGE Here to ensure pointing to your local path
+      - /home/remichu/work/ML/pai-agent/agent/egress:/out
+      # CHANGE here to point to a path to save the recording
+      # This path should have permission for the docker to write to e.g. 777
+      - /home/remichu/work/ML/pai-agent/agent/recording:/recording
+    security_opt:
+      # CHANGE Here to ensure pointing to your local path
+      - seccomp=/home/remichu/work/ML/pai-agent/agent/egress/chrome-sandboxing-seccomp-profile.json
+
+  pai-agent:
+    image: remichu/pai-agent:latest
+    network_mode: host
+    environment:
+      - ENV_RECORDING_FLAG=true     # this is for the agent to know to do recording
+#    volumes:
+#      - /home/remichu/my_system_prompt.txt:/app/system_prompt.txt         # overwrite system prompt
+#      - /home/remichu/my_tools.py:/app/tools.py                           # overwrite tool code
+
+
+  token-service:
+    image: remichu/pai-token:latest
+    network_mode: host

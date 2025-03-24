@@ -6,9 +6,12 @@ import uuid
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, Union, List
 import requests
+from datetime import datetime
 
 
-from livekit import rtc
+from livekit import rtc, api
+from livekit.protocol.egress import RoomCompositeEgressRequest, EncodedFileOutput, StopEgressRequest, EgressInfo
+from livekit.api.egress_service import EgressService
 from livekit.agents import (
     AutoSubscribe,
     JobContext,
@@ -16,9 +19,11 @@ from livekit.agents import (
 from livekit.plugins import openai
 from livekit.plugins.openai._oai_api import build_oai_function_description
 from livekit.plugins.openai.realtime import api_proto
+from MultiModalAgentModified import MultimodalAgentModified
+from livekit.agents import llm
+from typing import Literal
+import os
 
-
-from livekit import api
 from data_model import GallamaSessionConfig, TurnDetectionConfig
 import functools
 
@@ -29,10 +34,6 @@ load_dotenv()
 logger = logging.getLogger("my-worker")
 logger.setLevel(logging.INFO)
 
-from MultiModalAgentModified import MultimodalAgentModified
-from livekit.agents import llm
-from typing import Literal
-import os
 
 
 try:
@@ -45,6 +46,14 @@ except ImportError as e:
 
 last_config: Dict[str, Any] = {}        # global variable
 assistant: MultimodalAgentModified = None       # global variable
+
+
+# declare global variable for egress recording
+ENV_RECORDING_FLAG: bool = True if os.getenv("ENV_RECORDING_FLAG", False) else False  # the flag whether to record or not
+egress: EgressService = None
+# egress_request: RoomCompositeEgressRequest = None
+egress_info: EgressInfo = None
+
 
 with open("system_prompt.txt", "r") as file:
     DEFAULT_INSTRUCTION = file.read()
@@ -270,6 +279,33 @@ def parse_session_config(data: Dict[str, Any]) -> SessionConfig:
     )
     return config
 
+async def set_recording(room_name: str):
+    # for egress recording
+    global egress
+    global egress_info
+
+    lkapi = api.LiveKitAPI()
+    egress = lkapi.egress
+
+    now = datetime.now()
+
+    # Use it as part of a filename
+    filename = f"/recording/{now.strftime("%Y-%m-%d_%H-%M-%S")}.mp4"
+
+    egress_request = RoomCompositeEgressRequest(
+        room_name=room_name,
+        layout="",  # Layout can be left empty for audio-only recording
+        audio_only=True,
+        video_only=False,
+        file_outputs=[EncodedFileOutput(
+            filepath=filename,
+            disable_manifest=True,
+        )]
+    )
+    egress_info = await egress.start_room_composite_egress(
+        start=egress_request
+    )
+
 def parse_session_config_gallama(data: Dict[str, Any]) -> GallamaSessionConfig:
     turn_detection = None
     logger.info(f"Parsing session config Gallama: {data}")
@@ -311,6 +347,10 @@ async def entrypoint(ctx: JobContext):
     await ctx.connect(auto_subscribe=AutoSubscribe.SUBSCRIBE_ALL)
 
     participant = await ctx.wait_for_participant()
+
+    # record if ENV is set
+    if ENV_RECORDING_FLAG:
+        await set_recording(room_name=ctx.room.name)
 
     run_multimodal_agent(ctx, participant)
 
@@ -387,18 +427,46 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.Participant):
     assistant.start(ctx.room)
     session = model.sessions[0]
 
-    # if config.modalities == ["text", "audio"]:
-    #     session.conversation.item.create(
-    #         llm.ChatMessage(
-    #             role="user",
-    #             content="Hello",
-    #         )
-    #     )
-    #     session.response.create()
+    @ctx.room.on("participant_disconnected")
+    def on_participant_disconnected(participant: rtc.Participant):
+        logger.info(f"Participant {participant.name} disconnected. Stopping egress recording...")
+        global egress, egress_info
+
+        # stop recording if mobile client disconnect
+        if participant.name == "my name":
+            try:
+                # Get the current running loop and schedule the coroutine.
+                loop = asyncio.get_running_loop()
+                loop.create_task(
+                    egress.stop_egress(stop=StopEgressRequest(egress_id=egress_info.egress_id))
+                )
+                egress_info = None
+                logger.info("Egress recording stop initiated successfully.")
+            except Exception as e:
+                logger.error(f"Failed to stop egress recording: {e}")
+
+
+    @ctx.room.on("participant_connected")
+    def on_participant_connect(participant: rtc.Participant):
+        logger.info(f"Participant {participant.identity} connected. Check if egress recording is needed")
+        global egress, egress_info, ENV_RECORDING_FLAG
+
+        try:
+            if not egress_info and ENV_RECORDING_FLAG:
+                loop = asyncio.get_running_loop()
+                loop.create_task(
+                    set_recording(room_name=ctx.room.name)
+                )
+            elif egress_info:
+                logger.info("Recording already running")
+            logger.info("Egress recording stop initiated successfully.")
+        except Exception as e:
+            logger.error(f"Failed to stop egress recording: {e}")
+
 
     @ctx.room.local_participant.register_rpc_method("createInitialResponse")
     async def create_initial_response(
-            data: rtc.rpc.RpcInvocationData = None,
+        data: rtc.rpc.RpcInvocationData = None,
     ):
         """
         Trigger response creation. To be used when VAD is not activated.
@@ -477,6 +545,7 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.Participant):
             return json.dumps({"changed": "true"})
         else:
             return json.dumps({"changed": "false"})
+
 
     @ctx.room.local_participant.register_rpc_method("interruptAgent")
     async def interrupt_agent(
@@ -626,19 +695,15 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.Participant):
 
         return json.dumps({"changed": "true"})
 
-
     @ctx.room.local_participant.register_rpc_method("clearHistory")
     async def clear_message_history(
-        data: rtc.rpc.RpcInvocationData = None,
+            data: rtc.rpc.RpcInvocationData = None,
     ):
         """
-        This function send the time stamp when user click the record button on non handfree mode
-
-        :param data:
-            a list of available tool name
+        Clears the conversation history by sending a clear request to the backend and
+        deleting any in-progress conversation items.
         """
-
-        logger.info(f"clear conversation history")
+        logger.info("Clearing conversation history...")
 
         openai_base_url = os.getenv('OPENAI_BASE_URL', 'http://127.0.0.1:8000/v1')
 
@@ -647,34 +712,30 @@ def run_multimodal_agent(ctx: JobContext, participant: rtc.Participant):
             response = requests.post(
                 f"{openai_base_url}/clear_history",  # Endpoint for the backend
             )
-
-            # Check if the request was successful
             if response.status_code == 200:
-                logger.debug("Successfully clear history.")
+                logger.debug("Successfully cleared history on backend.")
             else:
-                print(
-                    f"Failed to clear history. Status code: {response.status_code}, Response: {response.text}")
+                logger.error(
+                    f"Failed to clear history. Status code: {response.status_code}, Response: {response.text}"
+                )
 
-            # clear in progress item
-            try:
-                # Retrieve current conversation items via the chat context
-                chat_ctx = session.chat_ctx_copy()
-                delete_tasks = []
-                for message in chat_ctx.messages:
-                    # Delete each conversation item by its id
-                    delete_tasks.append(session.conversation.item.delete(item_id=message.id))
-                if delete_tasks:
-                    await asyncio.gather(*delete_tasks)
-                    logger.info("Deleted existing conversation items")
-            except Exception as e:
-                pass
-
+            # # Clear conversation items locally
+            # try:
+            #     chat_ctx = session.chat_ctx_copy()
+            #     delete_tasks = [
+            #         session.conversation.item.delete(item_id=message.id)
+            #         for message in chat_ctx.messages
+            #     ]
+            #     if delete_tasks:
+            #         await asyncio.gather(*delete_tasks)
+            #         logger.info("Deleted existing conversation items")
+            # except Exception as e:
+            #     logger.error(f"Error deleting conversation items: {e}")
 
         except requests.exceptions.RequestException as e:
-            print(f"Failed to clear history: {e}")
+            logger.error(f"Failed to clear history: {e}")
 
         return json.dumps({"changed": "true"})
-
 
     @session.on("response_done")
     def on_response_done(response: openai.realtime.RealtimeResponse):

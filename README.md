@@ -39,6 +39,8 @@ gallama list available
 
 Download model with gallama installed:
 ```shell
+gallama download kokoro
+
 gallama download whisper-turbo
 # gallama download whisper-large-v3
 
@@ -65,6 +67,8 @@ docker run -e GALLAMA_HOME_PATH=/home/yourid/gallama -it --network=host -v -v /h
 
 # from here you would already be inside the gallama docker to run gallama command
 
+gallama download kokoro
+
 gallama download whisper-large-v3-turbo
 # gallama download whisper-large-v3
 
@@ -77,6 +81,9 @@ Running using Docker Compose is the easiest way to get start.
 Ensure that you have:
 - Docker installed (or any other container runtime tool with GPU support)
 - Nvidia Container Toolkit installed
+
+You can verify if you have docker working with gpus by running sample workload per Nvidia documentation:
+https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/sample-workload.html
 
 Download the model that you want to run and edit the docker compose accordingly *refer the docker-compose.yml*
 
@@ -107,4 +114,9 @@ You can find your server URL at by run this command on Ubuntu
 
 ### For remote access
 For remote access, you will need a VPN service that let you create a private network between your phone and your backend.
-I use tailscale (this is not endorsement), however, I would suggest that you do your research to find a solution that meet your security need. 
+One of possible choice is Tailscale, however, I would suggest that you do your research to find a solution that meet your security need.
+
+### Model Suggestion
+
+For a start I would suggest you test this with Qwen 2.5 VL 7B. Together with Whisper and Kokoro, it can fit in single GPU.
+For non vision model, you can pretty choose anything that you like.

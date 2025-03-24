@@ -1,0 +1,2 @@
+I will gladly answer your question now.
+However, this is a demo so I do not have any AI system backing. This App is meant for developer and researcher to test their Artificial Intelligence ability to perform question and answer.
